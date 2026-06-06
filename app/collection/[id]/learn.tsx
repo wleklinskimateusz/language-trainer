@@ -1,27 +1,34 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Flashcard } from '@/components/vocabulary/flashcard';
+import { ExerciseAnswerForm } from '@/components/vocabulary/exercise-answer-form';
+import { ExercisePrompt } from '@/components/vocabulary/exercise-prompt';
+import { useLearningSession } from '@/hooks/use-learning-session';
 import { useCollection, useCollectionEntries } from '@/hooks/use-vocabulary';
 import { useThemeColors } from '@/hooks/use-theme-colors';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export default function LearnScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const colorScheme = useColorScheme() ?? 'light';
   const colors = useThemeColors();
 
   const collection = useCollection(id);
   const entries = useCollectionEntries(id);
 
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isFlipped, setIsFlipped] = useState(false);
-  const [knowCount, setKnowCount] = useState(0);
-  const [dontKnowCount, setDontKnowCount] = useState(0);
-  const [finished, setFinished] = useState(false);
+  const {
+    currentExercise,
+    currentIndex,
+    checked,
+    isCorrect,
+    correctCount,
+    incorrectCount,
+    finished,
+    total,
+    check,
+    revealAnswer,
+    next,
+  } = useLearningSession(entries);
 
   if (!collection) {
     return (
@@ -31,30 +38,13 @@ export default function LearnScreen() {
     );
   }
 
-  if (entries.length === 0) {
+  if (entries.length === 0 || total === 0) {
     return (
       <ThemedView style={styles.centered}>
         <ThemedText>No words to learn</ThemedText>
       </ThemedView>
     );
   }
-
-  const currentEntry = entries[currentIndex];
-
-  const advance = (knew: boolean) => {
-    if (knew) {
-      setKnowCount((c) => c + 1);
-    } else {
-      setDontKnowCount((c) => c + 1);
-    }
-
-    if (currentIndex + 1 >= entries.length) {
-      setFinished(true);
-    } else {
-      setCurrentIndex((i) => i + 1);
-      setIsFlipped(false);
-    }
-  };
 
   if (finished) {
     return (
@@ -67,9 +57,9 @@ export default function LearnScreen() {
           <ThemedText style={styles.summarySubtitle}>{collection.name}</ThemedText>
 
           <View style={styles.stats}>
-            <Stat label="Total" value={entries.length} />
-            <Stat label="Know" value={knowCount} color="#4CAF50" />
-            <Stat label={"Don't know"} value={dontKnowCount} color="#E53935" />
+            <Stat label="Total" value={total} />
+            <Stat label="Correct" value={correctCount} color="#4CAF50" />
+            <Stat label="Incorrect" value={incorrectCount} color="#E53935" />
           </View>
 
           <Pressable
@@ -84,37 +74,43 @@ export default function LearnScreen() {
     );
   }
 
+  if (!currentExercise) {
+    return (
+      <ThemedView style={styles.centered}>
+        <ThemedText>No exercises available</ThemedText>
+      </ThemedView>
+    );
+  }
+
   return (
     <>
       <Stack.Screen
         options={{
-          title: `Learn · ${currentIndex + 1}/${entries.length}`,
+          title: `Learn · ${currentIndex + 1}/${total}`,
         }}
       />
 
-      <ThemedView style={styles.container}>
-        <Flashcard
-          entry={currentEntry}
-          isFlipped={isFlipped}
-          onFlip={() => setIsFlipped((f) => !f)}
-        />
-
-        <View style={styles.actions}>
-          <Pressable
-            style={[
-              styles.actionButton,
-              { backgroundColor: colorScheme === 'light' ? '#FFEBEE' : '#3D2020' },
-            ]}
-            onPress={() => advance(false)}>
-            <ThemedText style={styles.dontKnowText}>{"Don't know"}</ThemedText>
-          </Pressable>
-          <Pressable
-            style={[styles.actionButton, { backgroundColor: colors.primary }]}
-            onPress={() => advance(true)}>
-            <ThemedText style={[styles.knowText, { color: colors.onPrimary }]}>Know</ThemedText>
-          </Pressable>
-        </View>
-      </ThemedView>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+          <ThemedView style={styles.container}>
+            <ExercisePrompt
+              exercise={currentExercise}
+              currentIndex={currentIndex}
+              total={total}
+            />
+            <ExerciseAnswerForm
+              exercise={currentExercise}
+              checked={checked}
+              isCorrect={isCorrect}
+              onCheck={check}
+              onReveal={revealAnswer}
+              onNext={next}
+            />
+          </ThemedView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </>
   );
 }
@@ -131,34 +127,21 @@ function Stat({ label, value, color }: { label: string; value: number; color?: s
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
+  scroll: {
+    flexGrow: 1,
+  },
   container: {
     flex: 1,
     padding: 20,
-    gap: 20,
+    gap: 24,
   },
   centered: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  actions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  actionButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  dontKnowText: {
-    color: '#E53935',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  knowText: {
-    fontWeight: '600',
-    fontSize: 16,
   },
   summary: {
     flex: 1,

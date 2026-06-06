@@ -51,24 +51,3 @@ export function getEntryTypeLabel(type: EntryType): string {
       return 'Phrase';
   }
 }
-
-export function getFlashcardFront(entry: VocabularyEntry): string {
-  switch (entry.type) {
-    case 'noun':
-    case 'phrase':
-      return entry.meaning;
-    case 'verb':
-      return entry.infinitive;
-  }
-}
-
-export function getFlashcardBack(entry: VocabularyEntry): string {
-  switch (entry.type) {
-    case 'noun':
-      return `${entry.article} ${entry.singular}\n${entry.plural}`;
-    case 'verb':
-      return `Präteritum: ${entry.pastTense}\n${entry.meaning}`;
-    case 'phrase':
-      return entry.german;
-  }
-}

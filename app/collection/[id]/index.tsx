@@ -5,6 +5,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { EmptyState } from '@/components/vocabulary/empty-state';
 import { EntryListItem } from '@/components/vocabulary/entry-list-item';
+import { getExerciseCount } from '@/lib/exercises/build-queue';
 import {
   useCollection,
   useCollectionEntries,
@@ -18,6 +19,7 @@ export default function CollectionDetailScreen() {
 
   const collection = useCollection(id);
   const entries = useCollectionEntries(id);
+  const exerciseCount = getExerciseCount(entries);
   const { deleteEntry } = useVocabularyActions();
 
   if (!collection) {
@@ -61,7 +63,7 @@ export default function CollectionDetailScreen() {
             disabled={entries.length === 0}
             onPress={() => router.push(`/collection/${id}/learn` as Href)}>
             <ThemedText style={[styles.learnButtonText, { color: colors.onPrimary }]}>
-              Start Learning ({entries.length})
+              Start Learning ({exerciseCount})
             </ThemedText>
           </Pressable>
         </View>
