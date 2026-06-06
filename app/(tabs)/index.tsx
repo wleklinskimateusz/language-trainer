@@ -1,98 +1,220 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { type Href, router } from 'expo-router';
+import { useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { CollectionCard } from '@/components/vocabulary/collection-card';
+import { EmptyState } from '@/components/vocabulary/empty-state';
+import {
+  useCollectionEntryCount,
+  useCollections,
+  useVocabularyActions,
+  useVocabularyHydration,
+} from '@/hooks/use-vocabulary';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useThemeColors } from '@/hooks/use-theme-colors';
+import type { Collection } from '@/types/vocabulary';
 
-export default function HomeScreen() {
+function CollectionCardItem({
+  collection,
+  onPress,
+  onDelete,
+}: {
+  collection: Collection;
+  onPress: () => void;
+  onDelete: () => void;
+}) {
+  const entryCount = useCollectionEntryCount(collection.id);
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <CollectionCard
+      collection={collection}
+      entryCount={entryCount}
+      onPress={onPress}
+      onDelete={onDelete}
+    />
+  );
+}
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
+export default function CollectionsScreen() {
+  const insets = useSafeAreaInsets();
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = useThemeColors();
+  const borderColor = colorScheme === 'light' ? '#E5E7EB' : '#2A2D2E';
+
+  const hydrated = useVocabularyHydration();
+  const collections = useCollections();
+  const { createCollection, deleteCollection } = useVocabularyActions();
+
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newName, setNewName] = useState('');
+
+  const handleCreate = () => {
+    const name = newName.trim();
+    if (!name) return;
+    const collection = createCollection(name);
+    setNewName('');
+    setShowCreateForm(false);
+    router.push(`/collection/${collection.id}` as Href);
+  };
+
+  const handleDelete = (id: string, name: string) => {
+    Alert.alert(
+      'Delete collection',
+      `Delete "${name}" and all its words? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => deleteCollection(id) },
+      ]
+    );
+  };
+
+  if (!hydrated) {
+    return (
+      <ThemedView style={[styles.loading, { paddingTop: insets.top }]}>
+        <ActivityIndicator size="large" color={colors.tint} />
       </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    );
+  }
+
+  return (
+    <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
+      <View style={styles.header}>
+        <ThemedText type="title">Collections</ThemedText>
+        <ThemedText style={styles.subtitle}>German vocabulary</ThemedText>
+      </View>
+
+      {showCreateForm ? (
+        <View style={[styles.createForm, { borderColor }]}>
+          <TextInput
+            style={[styles.input, { color: colors.text, borderColor }]}
+            value={newName}
+            onChangeText={setNewName}
+            placeholder="Collection name"
+            placeholderTextColor="#9BA1A6"
+            autoFocus
+            onSubmitEditing={handleCreate}
+          />
+          <View style={styles.createActions}>
+            <Pressable onPress={() => { setShowCreateForm(false); setNewName(''); }}>
+              <ThemedText style={styles.cancelText}>Cancel</ThemedText>
+            </Pressable>
+            <Pressable
+              style={[styles.createButton, { backgroundColor: colors.primary }]}
+              onPress={handleCreate}>
+              <ThemedText style={[styles.createButtonText, { color: colors.onPrimary }]}>
+                Create
+              </ThemedText>
+            </Pressable>
+          </View>
+        </View>
+      ) : (
+        <Pressable
+          style={[styles.newButton, { backgroundColor: colors.primary }]}
+          onPress={() => setShowCreateForm(true)}>
+          <ThemedText style={[styles.newButtonText, { color: colors.onPrimary }]}>
+            New Collection
+          </ThemedText>
+        </Pressable>
+      )}
+
+      {collections.length === 0 ? (
+        <EmptyState
+          title="No collections yet"
+          description="Create a collection to start adding German words and phrases."
+          actionLabel="Create your first collection"
+          onAction={() => setShowCreateForm(true)}
+        />
+      ) : (
+        <FlatList
+          data={collections}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
+          renderItem={({ item }) => (
+            <CollectionCardItem
+              collection={item}
+              onPress={() => router.push(`/collection/${item.id}` as Href)}
+              onDelete={() => handleDelete(item.id, item.name)}
+            />
+          )}
+        />
+      )}
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
+  container: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  loading: {
+    flex: 1,
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  header: {
+    paddingTop: 16,
+    paddingBottom: 20,
+    gap: 4,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  subtitle: {
+    opacity: 0.6,
+    fontSize: 16,
+  },
+  newButton: {
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  newButtonText: {
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  createForm: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    gap: 10,
+    marginBottom: 16,
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+  },
+  createActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 16,
+  },
+  cancelText: {
+    fontSize: 15,
+    opacity: 0.7,
+  },
+  createButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  createButtonText: {
+    fontWeight: '600',
+  },
+  list: {
+    gap: 12,
+    paddingBottom: 32,
   },
 });
